@@ -63,3 +63,8 @@ while cap.isOpened():
     else : 
         break 
 # d is a list of all boxes detected in different video frames d[i] : coordinates of boxes detected in frame i 
+#d : list of boxes
+#d[i] : boxes found in frame i of the video 
+#shape of d[i] = D x 4 
+#D: number of persons in the frame
+#4 =  (x_top_left, y_top_left, width, height)
