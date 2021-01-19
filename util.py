@@ -1,3 +1,4 @@
+
 from __future__ import division
 
 import torch 
@@ -56,11 +57,10 @@ def predict_transform(prediction, inp_dim, anchors, num_classes, CUDA = True):
     
     return prediction
 
-
 ##################################Object Confidence Thresholding######################
 def transform_box(b_x, b_y, b_w, b_h):
     """
-    transform box from (b_x, b_y, b_w, b_h to c_top_x, c_top_y, c_bot_x, c_bot_y
+    transform box from (b_x, b_y, b_w, b_h to x_top_left y_top_left width height
     c_top_x, c_top_y : coordinates of top-left corner of box
     c_bot_x, c_bot_y : coordinates of bottom-right corner of box
     """
@@ -71,7 +71,7 @@ def transform_box(b_x, b_y, b_w, b_h):
     c_bot_y = b_y + b_h/2
     
     
-    return c_top_x, c_top_y, c_bot_x, c_bot_y
+    return c_top_x, c_top_y, b_w, b_h
 
 def write_results(prediction, confidence, num_classes, nms_conf = 0.4):
     """
@@ -250,3 +250,95 @@ def prep_image(img, inp_dim):
     img = img[:,:,::-1].transpose((2,0,1)).copy()
     img = torch.from_numpy(img).float().div(255.0).unsqueeze(0)
     return img
+################
+def detector_video( frame, inp_dim, model, confidence, num_classes, nms_thesh, CUDA):
+    '''
+    Outputs :
+     - D Boxes (x_top_left, y_top_left, width, height)
+    '''
+    img = prep_image(frame, inp_dim)
+    im_dim = frame.shape[1], frame.shape[0]
+    im_dim = torch.FloatTensor(im_dim).repeat(1,2)   
+
+    if CUDA:
+        im_dim = im_dim.cuda()
+        img = img.cuda()
+
+    output = model(Variable(img, volatile = True), CUDA)
+    output = write_results(output, confidence, num_classes, nms_conf = nms_thesh)
+    return output[:,1:5]
+################ Kalman filter
+import numpy as np
+from numpy import dot
+from scipy.linalg import inv, block_diag
+
+
+
+class KalmanTracker():
+    """
+    class for Kalman Filter-based tracker
+    """
+
+    def __init__(self):
+        super().__init__()
+        # Initialize parameters for Kalman Filtering
+        # The state is the (x, y) coordinates of the detection box
+        # state: [up, up_dot, left, left_dot, down, down_dot, right, right_dot]
+        # or[up, up_dot, left, left_dot, height, height_dot, width, width_dot]
+        self.dt = 1.  # time interval
+
+        # Process matrix, assuming constant velocity model
+        self.F = np.array([[1, self.dt, 0, 0, 0, 0, 0, 0],
+                           [0, 1, 0, 0, 0, 0, 0, 0],
+                           [0, 0, 1, self.dt, 0, 0, 0, 0],
+                           [0, 0, 0, 1, 0, 0, 0, 0],
+                           [0, 0, 0, 0, 1, self.dt, 0, 0],
+                           [0, 0, 0, 0, 0, 1, 0, 0],
+                           [0, 0, 0, 0, 0, 0, 1, self.dt],
+                           [0, 0, 0, 0, 0, 0, 0, 1]])
+
+        # Measurement matrix, assuming we can only measure the coordinates
+        self.H = np.array([[1, 0, 0, 0, 0, 0, 0, 0],
+                           [0, 0, 1, 0, 0, 0, 0, 0],
+                           [0, 0, 0, 0, 1, 0, 0, 0],
+                           [0, 0, 0, 0, 0, 0, 1, 0]])
+
+        # Initialize the state covariance
+        self.L = 10.0
+        self.P = np.diag(self.L * np.ones(8))
+
+        # Initialize the process covariance
+        self.Q_comp_mat = np.array([[self.dt ** 4 / 4., self.dt ** 3 / 2.],
+                                    [self.dt ** 3 / 2., self.dt ** 2]])
+        self.Q = block_diag(self.Q_comp_mat, self.Q_comp_mat,
+                            self.Q_comp_mat, self.Q_comp_mat)
+
+        # Initialize the measurement covariance
+        self.R_scaler = 1.0
+        self.R_diag_array = self.R_scaler * np.array([self.L, self.L, self.L, self.L])
+        self.R = np.diag(self.R_diag_array)
+
+    def update_R(self):
+        R_diag_array = self.R_scaler * np.array([self.L, self.L, self.L, self.L])
+        self.R = np.diag(R_diag_array)
+
+    def predict_and_update(self, z):
+        x = self.x_state
+        # Predict
+        x = dot(self.F, x)
+        self.P = dot(self.F, self.P).dot(self.F.T) + self.Q
+
+        # Update
+        S = dot(self.H, self.P).dot(self.H.T) + self.R
+        K = dot(self.P, self.H.T).dot(inv(S))  # Kalman gain
+        y = z - dot(self.H, x)  # residual
+        x += dot(K, y)
+        self.P = self.P - dot(K, self.H).dot(self.P)
+        self.x_state = x.astype(int)  # convert to integer coordinates
+
+    def predict_only(self):
+        x = self.x_state
+        # Predict
+        x = dot(self.F, x)
+        self.P = dot(self.F, self.P).dot(self.F.T) + self.Q
+        self.x_state = x.astype(int)
