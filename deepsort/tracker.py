@@ -37,6 +37,17 @@ class Track():
         
         return bbox
     
+    def to_xyah(self, bbox):
+        
+        x_left, y_left, width, height = bbox
+        a = width/height
+        x_center = 2*x_left + width
+        y_center = 2*y_left + height
+        
+        new_bbox = [x_center, y_center, a, height]
+        
+        return new_bbox
+    
     def check_age(self, max_age):
         """Check if the track is to old
         
@@ -80,9 +91,12 @@ class Track():
         detection : Detection
             The associated detection.
         """
-        self.mean, self.covariance = kf.update(
-            self.mean, self.covariance, detection.to_xyah())
-        self.features.append(detection.feature)
+        x,y,w,h, feature = detection
+        bbox = [x,y,w,h]
+        
+        self.mean, self.covariance = kf.update(self.mean, self.covariance,
+                                               self.to_xyah(bbox))
+        self.features.append(feature)
 
         self.hits += 1
         self.time_since_update = 0

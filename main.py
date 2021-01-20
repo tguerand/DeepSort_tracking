@@ -69,7 +69,10 @@ def get_detections():
             d.append(detector)
         else : 
             break 
-
+    file = r'./det/detections.txt'
+    for row in d:
+        np.savetxt(file, row)
+    file.close()
     return d
 # d is a list of all boxes detected in different video frames d[i] : coordinates of boxes detected in frame i 
 #d : list of boxes
@@ -78,15 +81,19 @@ def get_detections():
 #D: number of persons in the frame
 #4 =  (x_top_left, y_top_left, width, height)
 
-def main():
+def main(dfile_name=r'./det/detections.txt'):
     
     # Initialize
     metric = NearestNeighbor("cosine", 0.7)
     kf = KalmanFilter()
-    detections = get_detections()
-    tracker = tracker.Tracker(metric, kf)
+    if dfile_name is not None:
+        detections = np.loadtxt(dfile_name)
+    else:
+        detections = get_detections()
+    tracker = deepsort.tracker.Tracker(metric, kf)
     encoder = Encoder(r"./deepsort/checkpoints/ckpt.t7")
     video_path = video_file
+    output_path = r'output.txt'
     
     out_path = r"./output"
     if not os.exists(out_path):
@@ -98,11 +105,12 @@ def main():
     height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
     
-    dets = []
+    results = []
     i = 0
     while True:
         ret, frame = vid.read()
-        
+        dets = []
+        print(i)
         if ret:
             
             bboxes = detections[i]
@@ -113,12 +121,31 @@ def main():
                 x2, y2 = min(int(x + w), width -1), min(int(y + h), height -1)
                 img_crop = frame[x1:y1,x2:y2]
                 features = encoder(img_crop)
-                dets[i].append(bbox, features)
-        
+                dets.append(bbox, features)
+            
+            tracker.predict()
+            tracker.update(dets)
+            
+            for track in tracker.tracks:
+                if not track.state == 0 or track.time_since_update > 1:
+                    continue
+                bbox = track.get_position() # tlwh format
+                results.append([frame_idx, track.track_id,
+                                bbox[0], bbox[1], bbox[2], bbox[3]])
+                
         else:
             break
+        
+        i+=1
+        
+    # Store results.
+    f = open(output_file, 'w')
+    for row in results:
+        print('%d,%d,%.2f,%.2f,%.2f,%.2f,1,-1,-1,-1' % (
+            row[0], row[1], row[2], row[3], row[4], row[5]),file=f)
             
         
     
 if __name__ == "__main__":
+    #main(dfile_name=None)
     main()

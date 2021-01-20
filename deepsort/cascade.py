@@ -78,7 +78,7 @@ def gated_metric(tracker, dets, track_indices, detection_indices):
         
         tracks = tracker.tracks_list
     
-        features = np.array([dets[i].feature for i in detection_indices])
+        features = np.array([dets[i][-1] for i in detection_indices])
         targets = np.array([tracks[i].track_id for i in track_indices])
         
         cost_matrix = tracker.metric.distance(features, targets)
@@ -131,7 +131,7 @@ def gate_cost_matrix(kf, cost_matrix, tracks, detections, track_indices,
         
     gating_threshold = kalman.chi2inv95[gating_dim]
     measurements = np.asarray(
-        [to_xyah(detections[i]) for i in detection_indices])
+        [to_xyah(detections[i][:-1]) for i in detection_indices])
     
     for row, track_idx in enumerate(track_indices):
         track = tracks[track_idx]
@@ -288,6 +288,6 @@ def iou_cost(tracks, detections, track_indices=None,
             continue
 
         bbox = tracks[track_idx].to_tlwh()
-        candidates = np.asarray([detections[i].tlwh for i in detection_indices])
+        candidates = np.asarray([detections[i][:-1] for i in detection_indices])
         cost_matrix[row, :] = 1. - iou(bbox, candidates)
     return cost_matrix
