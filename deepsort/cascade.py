@@ -7,8 +7,7 @@ Created on Tue Jan 19 23:19:58 2021
 
 import numpy as np
 import kalman
-from sklearn.utils.linear_assignment_ import linear_assignment
-
+from scipy.optimize import linear_sum_assignment as linear_assignment
 INF = 1e+5
 
 def matching_cascade(tracker, detections, match_thresh):
