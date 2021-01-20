@@ -4,7 +4,7 @@ Created on Tue Jan 19 13:59:56 2021
 
 @author: trist
 """
-
+import numpy as np
 import cascade
 
 class Track():
@@ -92,9 +92,9 @@ class Track():
 
 class Tracker():
     
-    def __init__(self, max_age, kf, max_iou=0.7):
+    def __init__(self, metric, kf, max_iou=0.7, max_age=20):
         
-        
+        self.metric = metric
         self.tracks_list = []
         self.max_age = max_age
         self.max_iou = 0.7
@@ -125,6 +125,18 @@ class Tracker():
         for detection_idx in unmatched_detections:
             self._initiate_track(detections[detection_idx])
         self.tracks = [t for t in self.tracks if not t.is_deleted()]
+        
+        # Update distance metric.
+        active_targets = [t.track_id for t in self.tracks if t.is_confirmed()]
+        features, targets = [], []
+        for track in self.tracks:
+            if not track.is_confirmed():
+                continue
+            features += track.features
+            targets += [track.track_id for _ in track.features]
+            track.features = []
+        self.metric.partial_fit(np.asarray(features), np.asarray(targets), active_targets)
+
     
     
 

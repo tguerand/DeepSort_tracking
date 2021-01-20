@@ -5,10 +5,11 @@ Created on Tue Jan 19 11:19:47 2021
 @author: trist
 """
 
-from tracker import Track
+from tracker import Tracker
 from metrics import NearestNeighbor 
 
 
 def main():
     
-    metric = 
+    metric = NearestNeighbor
+    tracker = Tracker(metric)
