@@ -6,9 +6,12 @@ Created on Tue Jan 19 23:19:58 2021
 """
 
 import numpy as np
-from kalman import 
+import kalman
+from sklearn.utils.linear_assignment_ import linear_assignment
 
-def matching_cascade(tracker, detections):
+INF = 1e+5
+
+def matching_cascade(tracker, detections, match_thresh):
         """Performs the matching cascade
         Args
         --------
@@ -28,6 +31,11 @@ def matching_cascade(tracker, detections):
         unmatched_detections = detection_indices
         matches = []
         
+         # Split track set into confirmed and unconfirmed tracks.
+        confirmed_tracks = [i for i, t in enumerate(tracks) if t.state == 0]
+        unconfirmed_tracks = [i for i, t in enumerate(tracks) if not t.state == 0]
+        
+        
         for level in range(tracker.age_max):
             if len(unmatched_detections) == 0:  # No detections left
                 break
@@ -38,13 +46,31 @@ def matching_cascade(tracker, detections):
                 continue
     
             matches_l, _, unmatched_detections = min_cost_matching(gated_metric,
-                                                                   max_distance,
+                                                                   match_thresh,
                                                                    tracks,
                                                                    detections,
                                                                    track_indices_l,
                                                                    unmatched_detections)
             matches += matches_l
         unmatched_tracks = list(set(track_indices) - set(k for k, _ in matches))
+        
+        matches_a = matches
+        unmatched_tracks_a = unmatched_tracks
+        
+        
+        # Associate remaining tracks together with unconfirmed tracks using IOU.
+        iou_track_candidates = unconfirmed_tracks + [
+            k for k in unmatched_tracks_a if tracks[k].time_since_update == 1]
+        
+        unmatched_tracks_a = [k for k in unmatched_tracks_a if tracks[k].time_since_update != 1]
+        
+        matches_b, unmatched_tracks_b, unmatched_detections = min_cost_matching(
+                iou_matching.iou_cost, tracker.max_iou_distance, tracks,
+                detections, iou_track_candidates, unmatched_detections)
+
+        matches = matches_a + matches_b
+        unmatched_tracks = list(set(unmatched_tracks_a + unmatched_tracks_b))
+        return matches, unmatched_tracks, unmatched_detections
     
         
         return matches, unmatched_tracks, unmatched_detections
@@ -62,9 +88,8 @@ def gated_metric(tracker, dets, track_indices, detection_indices):
 
         return cost_matrix
 
-def gate_cost_matrix(
-    kf, cost_matrix, tracks, detections, track_indices, detection_indices,
-    gated_cost=INFTY_COST, only_position=False):
+def gate_cost_matrix(kf, cost_matrix, tracks, detections, track_indices,
+                     detection_indices, gated_cost=INF, only_position=False):
     """Invalidate infeasible entries in cost matrix based on the state
     distributions obtained by Kalman filtering.
 
@@ -99,19 +124,94 @@ def gate_cost_matrix(
         Returns the modified cost matrix.
 
     """
-    gating_dim = 2 if only_position else 4
+    
+    if only_position:
+        gating_dim = 2
+    else:
+        gating_dim = 4
+        
     gating_threshold = kalman.chi2inv95[gating_dim]
     measurements = np.asarray(
-        [detections[i].to_xyah() for i in detection_indices])
+        [to_xyah(detections[i]) for i in detection_indices])
     
     for row, track_idx in enumerate(track_indices):
         track = tracks[track_idx]
-        gating_distance = kf.gating_distance(
-            track.mean, track.covariance, measurements, only_position)
+        gating_distance = kf.gating_distance(track.mean, track.covariance,
+                                             measurements, only_position)
         cost_matrix[row, gating_distance > gating_threshold] = gated_cost
         
     return cost_matrix
 
+def to_xyah(bbox):
+    """Transforms a xywh bbox to a x_center,y_center,a,h"""
+    x, y, w, h = bbox
+    a = w/h
+    x_center = (x+w)/2
+    y_center = (y+h)/2
+    
+    return [x_center, y_center, a, h]
 
-def gate():
-    pass
+
+def min_cost_matching(distance_metric, max_distance, tracks,
+                      detections, track_indices=None, detection_indices=None):
+    """Solve linear assignment problem.
+
+    Parameters
+    ----------
+    distance_metric : Callable[List[Track], List[Detection], List[int], List[int]) -> ndarray
+        The distance metric is given a list of tracks and detections as well as
+        a list of N track indices and M detection indices. The metric should
+        return the NxM dimensional cost matrix, where element (i, j) is the
+        association cost between the i-th track in the given track indices and
+        the j-th detection in the given detection_indices.
+    max_distance : float
+        Gating threshold. Associations with cost larger than this value are
+        disregarded.
+    tracks : List[track.Track]
+        A list of predicted tracks at the current time step.
+    detections : List[detection.Detection]
+        A list of detections at the current time step.
+    track_indices : List[int]
+        List of track indices that maps rows in `cost_matrix` to tracks in
+        `tracks` (see description above).
+    detection_indices : List[int]
+        List of detection indices that maps columns in `cost_matrix` to
+        detections in `detections` (see description above).
+
+    Returns
+    -------
+    (List[(int, int)], List[int], List[int])
+        Returns a tuple with the following three entries:
+        * A list of matched track and detection indices.
+        * A list of unmatched track indices.
+        * A list of unmatched detection indices.
+
+    """
+    if track_indices is None:
+        track_indices = np.arange(len(tracks))
+    if detection_indices is None:
+        detection_indices = np.arange(len(detections))
+
+    if len(detection_indices) == 0 or len(track_indices) == 0:
+        return [], track_indices, detection_indices  # Nothing to match.
+
+    cost_matrix = distance_metric(tracks, detections, track_indices, detection_indices)
+    cost_matrix[cost_matrix > max_distance] = max_distance + 1e-5
+    indices = linear_assignment(cost_matrix)
+
+    matches, unmatched_tracks, unmatched_detections = [], [], []
+    for col, detection_idx in enumerate(detection_indices):
+        if col not in indices[:, 1]:
+            unmatched_detections.append(detection_idx)
+    for row, track_idx in enumerate(track_indices):
+        if row not in indices[:, 0]:
+            unmatched_tracks.append(track_idx)
+    for row, col in indices:
+        track_idx = track_indices[row]
+        detection_idx = detection_indices[col]
+        if cost_matrix[row, col] > max_distance:
+            unmatched_tracks.append(track_idx)
+            unmatched_detections.append(detection_idx)
+        else:
+            matches.append((track_idx, detection_idx))
+    return matches, unmatched_tracks, unmatched_detections

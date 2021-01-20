@@ -11,7 +11,7 @@ class Track():
     """Each track corresponds to an object detected on the screen"""
     
     
-    def __init__(self, mean, cov, track_id):
+    def __init__(self, mean, cov, track_id, match_thresh):
         
         self.state = -1 # three states: init = -1, confirmed = 0, deleted = 1
         
@@ -23,6 +23,7 @@ class Track():
         self.age = 1 # number of frames since last successful measurement
         self.hits = 1 # total of measurement updates
         self.age_update = 1 # number of frames since last update
+        self.match_thresh = match_thresh
         
     def get_position(self):
         """Returns the top left coordinates, width and height of the bbox"""
@@ -111,7 +112,8 @@ class Tracker():
         detections: list of detections bboxes"""
         
         matches, unmatched_tracks, unmatched_detections = cascade.matching_cascade(self, 
-                                                                                   detections)
+                                                                                   detections,
+                                                                                   self.match_thresh)
         # Update track set
         # update matches
         for track_idx, detection_idx in matches:
