@@ -136,7 +136,7 @@ class Tracker():
                                                                                    detections,
                                                                                    self.match_thresh)
         
-        print(unmatched_tracks)
+        
         # Update track set
         # update matches
         for track_idx, detection_idx in matches:
