@@ -131,7 +131,7 @@ def main( video_path, dfile_name=r'./det'):
     my_tracker = Tracker(metric, kf)
     encoder = Encoder(r"./deepsort/checkpoints/ckpt.t7")
     
-    output_path = r'output.txt'
+    output_path = r'./output/output.txt'
     
     out_path = r"./output"
     if not os.path.exists(out_path):
@@ -155,7 +155,7 @@ def main( video_path, dfile_name=r'./det'):
         if ret:
             
             bboxes = detections[i]
-            print(bboxes)
+            
             width, height = frame.shape[:2]
             features, box_left_idx = _get_features(bboxes, frame, width, height, encoder)
             
@@ -171,7 +171,7 @@ def main( video_path, dfile_name=r'./det'):
                 if not track.state == 0 or track.age_update > 1:
                     continue
                 bbox = track.get_position() # tlwh format
-                results.append([frame_idx, track.track_id,
+                results.append([i, track.track_id,
                                 bbox[0], bbox[1], bbox[2], bbox[3]])
                 
         else:
@@ -180,7 +180,7 @@ def main( video_path, dfile_name=r'./det'):
         i+=1
         
     # Store results.
-    f = open(output_file, 'w')
+    f = open(output_path, 'w')
     for row in results:
         print('%d,%d,%.2f,%.2f,%.2f,%.2f,1,-1,-1,-1' % (
             row[0], row[1], row[2], row[3], row[4], row[5]),file=f)

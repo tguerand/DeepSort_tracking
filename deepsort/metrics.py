@@ -28,7 +28,7 @@ class NearestNeighbor():
 
     """
 
-    def __init__(self, metric, matching_threshold):
+    def __init__(self, metric, matching_threshold, budget=None):
 
 
         if metric == "euclidean":
@@ -39,7 +39,7 @@ class NearestNeighbor():
             raise ValueError(
                 "Invalid metric; must be either 'euclidean' or 'cosine'")
         self.matching_threshold = matching_threshold
-        
+        self.budget = budget
         self.samples = {}
     
     def partial_fit(self, features, targets, active_targets):
@@ -80,7 +80,9 @@ class NearestNeighbor():
 
         """
         cost_matrix = np.zeros((len(targets), len(features)))
+        #print(self.samples)
         for i, target in enumerate(targets):
+            #print(self._metric(self.samples[target], features))
             cost_matrix[i, :] = self._metric(self.samples[target], features)
         return cost_matrix
 

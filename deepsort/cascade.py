@@ -29,28 +29,30 @@ def matching_cascade(tracker, detections, match_thresh):
         tracks = tracker.tracks_list
         unmatched_detections = detection_indices
         matches = []
-        
+
          # Split track set into confirmed and unconfirmed tracks.
         confirmed_tracks = [i for i, t in enumerate(tracks) if t.state == 0]
-        unconfirmed_tracks = [i for i, t in enumerate(tracks) if not t.state == 0]
+        unconfirmed_tracks = [i for i, t in enumerate(tracks) if t.state != 0]
         
+
         
         for level in range(tracker.max_age):
             if len(unmatched_detections) == 0:  # No detections left
                 break
     
             track_indices_l = [k for k in track_indices
-                               if tracks[k].time_since_update == 1 + level]
+                               if tracks[k].age_update == 1 + level]
             if len(track_indices_l) == 0:  # Nothing to match at this level
                 continue
     
             matches_l, _, unmatched_detections = min_cost_matching(gated_metric,
                                                                    match_thresh,
-                                                                   tracks,
+                                                                   tracker,
                                                                    detections,
                                                                    track_indices_l,
                                                                    unmatched_detections)
             matches += matches_l
+        
         unmatched_tracks = list(set(track_indices) - set(k for k, _ in matches))
         
         matches_a = matches
@@ -59,17 +61,16 @@ def matching_cascade(tracker, detections, match_thresh):
         
         # Associate remaining tracks together with unconfirmed tracks using IOU.
         iou_track_candidates = unconfirmed_tracks + [
-            k for k in unmatched_tracks_a if tracks[k].time_since_update == 1]
-        
-        unmatched_tracks_a = [k for k in unmatched_tracks_a if tracks[k].time_since_update != 1]
+            k for k in unmatched_tracks_a if tracks[k].age_update == 1]
+    
+        unmatched_tracks_a = [k for k in unmatched_tracks_a if tracks[k].age_update != 1]
         
         matches_b, unmatched_tracks_b, unmatched_detections = min_cost_matching(
-                iou_cost, tracker.max_iou, tracks,
+                iou_cost, tracker.max_iou, tracker,
                 detections, iou_track_candidates, unmatched_detections)
 
         matches = matches_a + matches_b
         unmatched_tracks = list(set(unmatched_tracks_a + unmatched_tracks_b))
-        return matches, unmatched_tracks, unmatched_detections
     
         
         return matches, unmatched_tracks, unmatched_detections
@@ -131,11 +132,11 @@ def gate_cost_matrix(kf, cost_matrix, tracks, detections, track_indices,
         
     gating_threshold = kalman.chi2inv95[gating_dim]
     measurements = np.asarray(
-        [to_xyah(detections[i][:-1]) for i in detection_indices])
+        [to_xyah(detections[i][0]) for i in detection_indices])
     
     for row, track_idx in enumerate(track_indices):
         track = tracks[track_idx]
-        gating_distance = kf.gating_distance(track.mean, track.covariance,
+        gating_distance = kf.gating_distance(track.mean, track.cov,
                                              measurements, only_position)
         cost_matrix[row, gating_distance > gating_threshold] = gated_cost
         
@@ -151,7 +152,7 @@ def to_xyah(bbox):
     return [x_center, y_center, a, h]
 
 
-def min_cost_matching(distance_metric, max_distance, tracks,
+def min_cost_matching(distance_metric, max_distance, tracker,
                       detections, track_indices=None, detection_indices=None):
     """Solve linear assignment problem.
 
@@ -186,6 +187,7 @@ def min_cost_matching(distance_metric, max_distance, tracks,
         * A list of unmatched detection indices.
 
     """
+    tracks = tracker.tracks_list
     if track_indices is None:
         track_indices = np.arange(len(tracks))
     if detection_indices is None:
@@ -194,10 +196,12 @@ def min_cost_matching(distance_metric, max_distance, tracks,
     if len(detection_indices) == 0 or len(track_indices) == 0:
         return [], track_indices, detection_indices  # Nothing to match.
 
-    cost_matrix = distance_metric(tracks, detections, track_indices, detection_indices)
+    cost_matrix = distance_metric(tracker, detections, track_indices, detection_indices)
     cost_matrix[cost_matrix > max_distance] = max_distance + 1e-5
     indices = linear_assignment(cost_matrix)
-
+    indices = np.concatenate((np.array([indices[0]]), np.array([indices[1]])))
+    
+    
     matches, unmatched_tracks, unmatched_detections = [], [], []
     for col, detection_idx in enumerate(detection_indices):
         if col not in indices[:, 1]:
@@ -205,7 +209,8 @@ def min_cost_matching(distance_metric, max_distance, tracks,
     for row, track_idx in enumerate(track_indices):
         if row not in indices[:, 0]:
             unmatched_tracks.append(track_idx)
-    for row, col in indices:
+    
+    for row, col in np.ndindex(indices.shape):
         track_idx = track_indices[row]
         detection_idx = detection_indices[col]
         if cost_matrix[row, col] > max_distance:
@@ -251,7 +256,7 @@ def iou(bbox, candidates):
     return area_intersection / (area_bbox + area_candidates - area_intersection)
 
 
-def iou_cost(tracks, detections, track_indices=None,
+def iou_cost(tracker, detections, track_indices=None,
              detection_indices=None):
     """An intersection over union distance metric.
 
@@ -276,6 +281,7 @@ def iou_cost(tracks, detections, track_indices=None,
         `1 - iou(tracks[track_indices[i]], detections[detection_indices[j]])`.
 
     """
+    tracks = tracker.tracks_list
     if track_indices is None:
         track_indices = np.arange(len(tracks))
     if detection_indices is None:
@@ -283,7 +289,7 @@ def iou_cost(tracks, detections, track_indices=None,
 
     cost_matrix = np.zeros((len(track_indices), len(detection_indices)))
     for row, track_idx in enumerate(track_indices):
-        if tracks[track_idx].time_since_update > 1:
+        if tracks[track_idx].age_update > 1:
             cost_matrix[row, :] = INF
             continue
 

@@ -24,7 +24,6 @@ class Track():
         self.hits = 1 # total of measurement updates
         self.age_update = 1 # number of frames since last update
         self.features = []
-        self.features = []
         if feature is not None:
             self.features.append(feature)
 
@@ -82,9 +81,9 @@ class Track():
         kf : kalman_filter.KalmanFilter
             The Kalman filter.
         """
-        self.mean, self.covariance = kf.predict(self.mean, self.covariance)
+        self.mean, self.cov = kf.predict(self.mean, self.cov)
         self.age += 1
-        self.time_since_update += 1
+        self.age_update += 1
         
     
     def update(self, kf, detection):
@@ -112,12 +111,12 @@ class Track():
 
 class Tracker():
     
-    def __init__(self, metric, kf, max_iou=0.7, max_age=20, match_thresh=100, n_init=3):
+    def __init__(self, metric, kf, max_iou=0.7, max_age=20, match_thresh=0.7, n_init=3):
         
         self.metric = metric
         self.tracks_list = []
         self.max_age = max_age
-        self.max_iou = 0.7
+        self.max_iou = max_iou
         self.kf = kf
         self.match_thresh = match_thresh
         self._next_id = 1
@@ -132,32 +131,37 @@ class Tracker():
         """Args
         --------
         detections: list of detections bboxes"""
-        
+        #print(detections)
         matches, unmatched_tracks, unmatched_detections = cascade.matching_cascade(self, 
                                                                                    detections,
                                                                                    self.match_thresh)
+        
+        print(unmatched_tracks)
         # Update track set
         # update matches
         for track_idx, detection_idx in matches:
-            self.tracks[track_idx].update(self.kf, detections[detection_idx])
+            self.tracks_list[track_idx].update(self.kf, detections[detection_idx])
         # update unmatched tracks
         for track_idx in unmatched_tracks:
-            self.tracks[track_idx].delete(self.max_age)
+            self.tracks_list[track_idx].delete(self.max_age)
         # update unmatched_detections
         for detection_idx in unmatched_detections:
             self.init_track(detections[detection_idx])
         self.tracks_list = [t for t in self.tracks_list if t.state != 1]
         
         # Update distance metric.
-        active_targets = [t.track_id for t in self.tracks_list if t.state == 0]
+        active_targets = [t.track_id for t in self.tracks_list if t.state != 1] # == 0
         features, targets = [], []
         for track in self.tracks_list:
-            if track != 0:
+            if track.state == 0: # != 0
                 continue
             features += track.features
             targets += [track.track_id for _ in track.features]
             track.features = []
+
+        
         self.metric.partial_fit(np.asarray(features), np.asarray(targets), active_targets)
+        
 
     
     
@@ -177,3 +181,5 @@ class Tracker():
         return self.tracks_list.append(Track(mean, covariance,
                                              self._next_id-1, self.n_init,
                                              self.max_age, feature=detection[-1]))
+
+
