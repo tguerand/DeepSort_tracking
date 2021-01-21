@@ -11,7 +11,7 @@ class Track():
     """Each track corresponds to an object detected on the screen"""
     
     
-    def __init__(self, mean, cov, track_id, match_thresh):
+    def __init__(self, mean, cov, track_id, n_init, max_age, feature=None):
         
         self.state = -1 # three states: init = -1, confirmed = 0, deleted = 1
         
@@ -23,7 +23,13 @@ class Track():
         self.age = 1 # number of frames since last successful measurement
         self.hits = 1 # total of measurement updates
         self.age_update = 1 # number of frames since last update
-        self.match_thresh = match_thresh
+        self.features = []
+        self.features = []
+        if feature is not None:
+            self.features.append(feature)
+
+        self._n_init = n_init
+        self._max_age = max_age
         
     def get_position(self):
         """Returns the top left coordinates, width and height of the bbox"""
@@ -106,7 +112,7 @@ class Track():
 
 class Tracker():
     
-    def __init__(self, metric, kf, max_iou=0.7, max_age=20, match_thresh=100):
+    def __init__(self, metric, kf, max_iou=0.7, max_age=20, match_thresh=100, n_init=3):
         
         self.metric = metric
         self.tracks_list = []
@@ -114,7 +120,8 @@ class Tracker():
         self.max_iou = 0.7
         self.kf = kf
         self.match_thresh = match_thresh
-    
+        self._next_id = 1
+        self.n_init = n_init
     
     def predict(self):
         
@@ -138,14 +145,14 @@ class Tracker():
             self.tracks[track_idx].delete(self.max_age)
         # update unmatched_detections
         for detection_idx in unmatched_detections:
-            self._initiate_track(detections[detection_idx])
-        self.tracks = [t for t in self.tracks if not t.is_deleted()]
+            self.init_track(detections[detection_idx])
+        self.tracks_list = [t for t in self.tracks_list if t.state != 1]
         
         # Update distance metric.
-        active_targets = [t.track_id for t in self.tracks if t.is_confirmed()]
+        active_targets = [t.track_id for t in self.tracks_list if t.state == 0]
         features, targets = [], []
-        for track in self.tracks:
-            if not track.is_confirmed():
+        for track in self.tracks_list:
+            if track != 0:
                 continue
             features += track.features
             targets += [track.track_id for _ in track.features]
@@ -164,8 +171,9 @@ class Tracker():
         Returns
         --------
         track: a track"""
-        mean, covariance = self.kf.initiate(detection)
+        
+        mean, covariance = self.kf.initiate(detection[0])
         self._next_id += 1
-        return self.tracks.append(Track(mean, covariance,
-                                        self._next_id-1, self.n_init,
-                                        self.max_age, detection.feature))
+        return self.tracks_list.append(Track(mean, covariance,
+                                             self._next_id-1, self.n_init,
+                                             self.max_age, feature=detection[-1]))

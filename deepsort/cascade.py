@@ -35,7 +35,7 @@ def matching_cascade(tracker, detections, match_thresh):
         unconfirmed_tracks = [i for i, t in enumerate(tracks) if not t.state == 0]
         
         
-        for level in range(tracker.age_max):
+        for level in range(tracker.max_age):
             if len(unmatched_detections) == 0:  # No detections left
                 break
     
@@ -64,7 +64,7 @@ def matching_cascade(tracker, detections, match_thresh):
         unmatched_tracks_a = [k for k in unmatched_tracks_a if tracks[k].time_since_update != 1]
         
         matches_b, unmatched_tracks_b, unmatched_detections = min_cost_matching(
-                iou_cost, tracker.max_iou_distance, tracks,
+                iou_cost, tracker.max_iou, tracks,
                 detections, iou_track_candidates, unmatched_detections)
 
         matches = matches_a + matches_b

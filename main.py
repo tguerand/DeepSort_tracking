@@ -62,20 +62,20 @@ def get_detections():
     frames = 0  
     start = time.time()
     d =[]
+    i = 0
     while cap.isOpened():
         ret, frame = cap.read()
         if ret :
             # detector is a D x 4 : all boxes detected in the frame
             detector = detector_video( frame, inp_dim, model, confidence, num_classes, nms_thesh, CUDA)
             d.append(detector)
-            
+            file = open('./det/detections'+str(i)+'.txt','w')
+            np.savetxt(file, detector, fmt="%d")
+            file.close()
         else : 
             break 
-    for i, frame in enumerate(d):
-        file = open('./det/detections'+str(i)+'.txt','w')
-        for row in frame:
-            np.savetxt(file, row)
-        file.close()
+        i+=1
+    
     return d
 # d is a list of all boxes detected in different video frames d[i] : coordinates of boxes detected in frame i 
 #d : list of boxes
@@ -97,7 +97,7 @@ def _get_features(bbox_xywh, ori_img, width, height, encoder):
         im_crops = []
         box_left_idx = []
         for i, box in enumerate(bbox_xywh):
-            print(i)
+    
             if (box == [0, 0, 0, 0]).all():
                 box_left_idx.append(i - len(bbox_xywh))
                 continue
@@ -125,7 +125,7 @@ def main( video_path, dfile_name=r'./det'):
             if file.endswith('.txt'):
                 files.append(file)
                 
-                detections.append(np.loadtxt(os.path.join(dfile_name, file)))
+                detections.append(np.array(np.loadtxt(os.path.join(dfile_name, file))))
     else:
         detections = get_detections()
     my_tracker = Tracker(metric, kf)
@@ -155,6 +155,7 @@ def main( video_path, dfile_name=r'./det'):
         if ret:
             
             bboxes = detections[i]
+            print(bboxes)
             width, height = frame.shape[:2]
             features, box_left_idx = _get_features(bboxes, frame, width, height, encoder)
             
@@ -166,8 +167,8 @@ def main( video_path, dfile_name=r'./det'):
             my_tracker.predict()
             my_tracker.update(dets)
             
-            for track in my_tracker.tracks:
-                if not track.state == 0 or track.time_since_update > 1:
+            for track in my_tracker.tracks_list:
+                if not track.state == 0 or track.age_update > 1:
                     continue
                 bbox = track.get_position() # tlwh format
                 results.append([frame_idx, track.track_id,
@@ -188,4 +189,4 @@ def main( video_path, dfile_name=r'./det'):
     
 if __name__ == "__main__":
     #main(dfile_name=None)
-    main(videofile)
+    main(videofile)#, dfile_name=None)
