@@ -14,11 +14,12 @@ import pickle as pkl
 import pandas as pd
 import random
 
-import deepsort
+
 from deepsort.model_encoder.encoder import Encoder
 from deepsort.metrics import NearestNeighbor
 from deepsort.kalman import KalmanFilter
-#from deepsort.tracker import Tracker
+from deepsort.tracker import Tracker
+
 #import deepsort
 
 #Name of video file
@@ -67,12 +68,14 @@ def get_detections():
             # detector is a D x 4 : all boxes detected in the frame
             detector = detector_video( frame, inp_dim, model, confidence, num_classes, nms_thesh, CUDA)
             d.append(detector)
+            
         else : 
             break 
-    file = r'./det/detections.txt'
-    for row in d:
-        np.savetxt(file, row)
-    file.close()
+    for i, frame in enumerate(d):
+        file = open('./det/detections'+str(i)+'.txt','w')
+        for row in frame:
+            np.savetxt(file, row)
+        file.close()
     return d
 # d is a list of all boxes detected in different video frames d[i] : coordinates of boxes detected in frame i 
 #d : list of boxes
@@ -81,28 +84,61 @@ def get_detections():
 #D: number of persons in the frame
 #4 =  (x_top_left, y_top_left, width, height)
 
-def main(dfile_name=r'./det/detections.txt'):
+def _xywh_to_xyxy(bbox_xywh, width, height):
+        x, y, w, h = bbox_xywh
+        x1 = max(int(x - w / 2), 0)
+        x2 = min(int(x + w / 2), width - 1)
+        y1 = max(int(y - h / 2), 0)
+        y2 = min(int(y + h / 2), height - 1)
+        return x1, y1, x2, y2
+
+
+def _get_features(bbox_xywh, ori_img, width, height, encoder):
+        im_crops = []
+        box_left_idx = []
+        for i, box in enumerate(bbox_xywh):
+            print(i)
+            if (box == [0, 0, 0, 0]).all():
+                box_left_idx.append(i - len(bbox_xywh))
+                continue
+            x1, y1, x2, y2 = _xywh_to_xyxy(box, width, height)
+            im = ori_img[y1:y2, x1:x2]
+            im_crops.append(im)
+            
+        
+        if im_crops:
+            features = encoder(im_crops)
+        else:
+            features = np.array([])
+        return features, box_left_idx
+
+
+def main( video_path, dfile_name=r'./det'):
     
     # Initialize
     metric = NearestNeighbor("cosine", 0.7)
     kf = KalmanFilter()
     if dfile_name is not None:
-        detections = np.loadtxt(dfile_name)
+        files = []
+        detections = []
+        for file in os.listdir(dfile_name):
+            if file.endswith('.txt'):
+                files.append(file)
+                
+                detections.append(np.loadtxt(os.path.join(dfile_name, file)))
     else:
         detections = get_detections()
-    tracker = deepsort.tracker.Tracker(metric, kf)
+    my_tracker = Tracker(metric, kf)
     encoder = Encoder(r"./deepsort/checkpoints/ckpt.t7")
-    video_path = video_file
+    
     output_path = r'output.txt'
     
     out_path = r"./output"
-    if not os.exists(out_path):
+    if not os.path.exists(out_path):
         os.mkdir(out_path)
         
     # Load video
     vid = cv2.VideoCapture(video_path)
-    width = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
     
     
     results = []
@@ -111,22 +147,26 @@ def main(dfile_name=r'./det/detections.txt'):
         ret, frame = vid.read()
         dets = []
         print(i)
+        
+        # frame /= 255.0  # 0 - 255 to 0.0 - 1.0
+        # if frame.ndimension() == 3:
+        #     frame = img.unsqueeze(0)
+        
         if ret:
             
             bboxes = detections[i]
-            dets.append([])
-            for bbox in bboxes:
-                x, y, w, h = bbox
-                x1, y1 = max(int(x), 0), max(int(y), 0)
-                x2, y2 = min(int(x + w), width -1), min(int(y + h), height -1)
-                img_crop = frame[x1:y1,x2:y2]
-                features = encoder(img_crop)
-                dets.append(bbox, features)
+            width, height = frame.shape[:2]
+            features, box_left_idx = _get_features(bboxes, frame, width, height, encoder)
             
-            tracker.predict()
-            tracker.update(dets)
+            for idx in box_left_idx:
+                bboxes = np.delete(bboxes, idx, axis=0)
+
+            dets = [[bboxes[j], features[j]] for j in range(len(bboxes))]
             
-            for track in tracker.tracks:
+            my_tracker.predict()
+            my_tracker.update(dets)
+            
+            for track in my_tracker.tracks:
                 if not track.state == 0 or track.time_since_update > 1:
                     continue
                 bbox = track.get_position() # tlwh format
@@ -148,4 +188,4 @@ def main(dfile_name=r'./det/detections.txt'):
     
 if __name__ == "__main__":
     #main(dfile_name=None)
-    main()
+    main(videofile)

@@ -5,7 +5,7 @@ Created on Tue Jan 19 13:59:56 2021
 @author: trist
 """
 import numpy as np
-import cascade
+from . import cascade
 
 class Track():
     """Each track corresponds to an object detected on the screen"""
@@ -106,13 +106,14 @@ class Track():
 
 class Tracker():
     
-    def __init__(self, metric, kf, max_iou=0.7, max_age=20):
+    def __init__(self, metric, kf, max_iou=0.7, max_age=20, match_thresh=100):
         
         self.metric = metric
         self.tracks_list = []
         self.max_age = max_age
         self.max_iou = 0.7
         self.kf = kf
+        self.match_thresh = match_thresh
     
     
     def predict(self):
