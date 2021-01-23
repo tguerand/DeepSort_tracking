@@ -26,7 +26,7 @@ from deepsort.tracker import Tracker
 videofile = r'.\data\MOT16\video.avi'
 
 #Parameters of YOLO detector
-confidence = float(0.4)
+confidence = float(0.5)
 nms_thesh = float(0.4)
 start = 0
 reso = 416 #Image resolution
