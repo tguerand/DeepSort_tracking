@@ -61,14 +61,18 @@ def get_detections():
     
     frames = 0  
     start = time.time()
-    d =[]
+    d =[] #list of box coordinates
+    s =[] # list of box scores
     i = 0
     while cap.isOpened():
         ret, frame = cap.read()
         if ret :
             # detector is a D x 4 : all boxes detected in the frame
-            detector = detector_video( frame, inp_dim, model, confidence, num_classes, nms_thesh, CUDA)
+            dett = detector_video( frame, inp_dim, model, confidence, num_classes, nms_thesh, CUDA)
+            detector = dett[:,:4] # coordinates of boxes
+            scores = dett[:,4] # scores of boxes
             d.append(detector)
+            s.append(scores)
             file = open('./det/detections'+str(i)+'.txt','w')
             np.savetxt(file, detector, fmt="%d")
             file.close()
@@ -76,7 +80,7 @@ def get_detections():
             break 
         i+=1
     
-    return d
+    return d, s
 # d is a list of all boxes detected in different video frames d[i] : coordinates of boxes detected in frame i 
 #d : list of boxes
 #d[i] : boxes found in frame i of the video 
@@ -127,7 +131,7 @@ def main( video_path, dfile_name=r'./det'):
                 
                 detections.append(np.array(np.loadtxt(os.path.join(dfile_name, file))))
     else:
-        detections = get_detections()
+        detections = get_detections()[0]
     my_tracker = Tracker(metric, kf)
     encoder = Encoder(r"./deepsort/checkpoints/ckpt.t7")
     
