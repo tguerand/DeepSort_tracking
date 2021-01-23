@@ -148,17 +148,19 @@ class Tracker():
         for detection_idx in unmatched_detections:
             self.init_track(detections[detection_idx])
         self.tracks_list = [t for t in self.tracks_list if t.state != 1]
+        #print(len(self.tracks_list))
         
         # Update distance metric.
         active_targets = [t.track_id for t in self.tracks_list if t.state != 1] # == 0
         features, targets = [], []
         for track in self.tracks_list:
-            if track.state == 0: # != 0
+            if track.state == 1: # != 0
                 continue
             features += track.features
             targets += [track.track_id for _ in track.features]
             track.features = []
-
+        #print(active_targets)
+        #print(targets)
         
         self.metric.partial_fit(np.asarray(features), np.asarray(targets), active_targets)
         

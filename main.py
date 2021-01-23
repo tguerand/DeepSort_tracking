@@ -148,6 +148,7 @@ def main( video_path, dfile_name=r'./det'):
         dets = []
         print(i)
         
+        frame = np.reshape(frame, (reso,reso, frame.shape[-1]))
         # frame /= 255.0  # 0 - 255 to 0.0 - 1.0
         # if frame.ndimension() == 3:
         #     frame = img.unsqueeze(0)
@@ -170,6 +171,7 @@ def main( video_path, dfile_name=r'./det'):
             for track in my_tracker.tracks_list:
                 if not track.state == 0 or track.age_update > 1:
                     continue
+                print('aa')
                 bbox = track.get_position() # tlwh format
                 results.append([i, track.track_id,
                                 bbox[0], bbox[1], bbox[2], bbox[3]])

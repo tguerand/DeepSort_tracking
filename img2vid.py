@@ -10,16 +10,22 @@ import cv2
 import numpy as np
 import glob
 from tqdm import tqdm
+import os
  
+dir_path = r'C:\Users\trist\Documents\CS\3A\DL\project\DeepSort_tracking\output\originals'
+out_path = r'C:\Users\trist\Documents\CS\3A\DL\project\DeepSort_tracking\output\orignal_det.avi'
+
+
+    
 img_array = []
-for filename in glob.glob(r'.\data\MOT16\train\MOT16-02\img1\*.jpg'):
+for filename in glob.glob(os.path.join(dir_path , r'*.jpg')):
     img = cv2.imread(filename)
     height, width, layers = img.shape
     size = (width,height)
     img_array.append(img)
  
  
-out_path = r'.\data\MOT16\video.avi'
+
 out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*'DIVX'), 15, size)
  
 for i in tqdm(range(len(img_array))):
