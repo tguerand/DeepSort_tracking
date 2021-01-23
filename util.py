@@ -254,7 +254,7 @@ def prep_image(img, inp_dim):
 def detector_video( frame, inp_dim, model, confidence, num_classes, nms_thesh, CUDA):
     '''
     Outputs :
-     - D Boxes (x_top_left, y_top_left, width, height)
+     - D Boxes (x_top_left, y_top_left, width, height, score)
     '''
     img = prep_image(frame, inp_dim)
     im_dim = frame.shape[1], frame.shape[0]
@@ -266,7 +266,7 @@ def detector_video( frame, inp_dim, model, confidence, num_classes, nms_thesh, C
 
     output = model(Variable(img, volatile = True), CUDA)
     output = write_results(output, confidence, num_classes, nms_conf = nms_thesh)
-    return output[:,1:5]
+    return output[:,1:6]
 ################ Kalman filter
 import numpy as np
 from numpy import dot
