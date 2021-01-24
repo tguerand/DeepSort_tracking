@@ -74,10 +74,11 @@ def get_detections():
             d_s = np.zeros((detector.shape[0], 5))
             d_s[:,:4] = detector
             d_s[:,4] = scores
+            
             d.append(detector)
             s.append(scores)
             file = open('./det/dets/detections'+str(i)+'.txt','w')
-            np.savetxt(file, d_s, fmt="%d")
+            np.savetxt(file, d_s, fmt="%1.3f")
             file.close()
         else : 
             break 

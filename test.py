@@ -21,6 +21,7 @@ import pickle as pkl
 import pandas as pd
 import random
 import img2vid
+import json
 
 from deepsort.model_encoder.encoder import Encoder
 #from deepsort.metrics import NearestNeighbor
@@ -60,13 +61,19 @@ def draw_boxes(img, bbox, identities=None, offset=(0, 0)):
                                  t_size[1] + 4), cv2.FONT_HERSHEY_PLAIN, 2, [255, 255, 255], 2)
     return img
 
-def _xywh_to_xyxy(bbox_xywh, width, height):
+def _tlwh_to_xyxy(bbox_xywh, width, height):
         x, y, w, h = bbox_xywh
         x1 = int(x)#max(int(x - w / 2), 0)
         x2 = int(x + w)#min(int(x + w / 2), width - 1)
         y1 = int(y)#max(int(y - h / 2), 0)
         y2 = int(y + h)#min(int(y + h / 2), height - 1)
         return x1, y1, x2, y2
+
+def _tlwh_to_xywh(bbox_tlwh):
+    x, y, w, h = bbox_tlwh
+    x_c = int(x + w/2)
+    y_c = int(y + h/2)
+    return [x_c, y_c, w, h] 
 
 
 def _get_features(bbox_xywh, ori_img, width, height, encoder):
@@ -77,7 +84,7 @@ def _get_features(bbox_xywh, ori_img, width, height, encoder):
             if (box == [0, 0, 0, 0]).all():
                 box_left_idx.append(i - len(bbox_xywh))
                 continue
-            x1, y1, x2, y2 = _xywh_to_xyxy(box, width, height)
+            x1, y1, x2, y2 = _tlwh_to_xyxy(box, width, height)
             im = ori_img[y1:y2, x1:x2]
             im_crops.append(im)
             
@@ -88,7 +95,11 @@ def _get_features(bbox_xywh, ori_img, width, height, encoder):
             features = np.array([])
         return features, box_left_idx
 
-
+def get_config(config_path):
+    dico = {}
+    with open(config_path) as file:
+        dico = json.load(file)
+    return dico
 
 
 def main(video_path, dfile_name=r'./det/dets/', config_path='./cfg/config.json'):
@@ -105,12 +116,12 @@ def main(video_path, dfile_name=r'./det/dets/', config_path='./cfg/config.json')
     else:
         detections = get_detections()
     
-    
+    args = get_config(config_path)
     output_path = r'./output/output.txt'
     save_txt = True
     save_vid = True
     save_path = r'./output/output.avi'
-    vid_writer = None
+    
     
     out_path = r"./output"
     if not os.path.exists(out_path):
@@ -121,34 +132,41 @@ def main(video_path, dfile_name=r'./det/dets/', config_path='./cfg/config.json')
     
     deep = deep_sort.DeepSort(r"./deepsort/checkpoints/new_ckpt.t7")
     
-    results = []
+   
     i = 0
     while True:
         ret, frame = vid.read()
-        dets = []
+
         print(i)
-        
-        
         
         if ret:
             frame = cv2.resize(frame, (416, 416))
             
-            
-            bboxes = detections[i]
-            
+            print(detections[i])
+            bboxes, scores = detections[i][:,:4], detections[i][:,4]
+            bboxes = [_tlwh_to_xywh(bbox) for bbox in bboxes]
             
             if len(bboxes) == 0:
                 deep.increment_ages()
             
             width, height = frame.shape[:2]
-            features, box_left_idx = _get_features(bboxes, frame, width, height, encoder)
             
-            for idx in box_left_idx:
-                bboxes = np.delete(bboxes, idx, axis=0)
+            
+            for idx, box in enumerate(bboxes):
+                if (box == [0, 0, 0, 0]).all():
+                    bboxes = np.delete(bboxes, idx, axis=0)
+                    scores = np.delete(scores, idx)
 
-            dets = [[bboxes[j], features[j]] for j in range(len(bboxes))]
             
-            outputs = deep.update(bboxes, scores, frame)
+            outputs = deep.update(bboxes, scores, frame,
+                                  max_dist=args['MAX_DIST'],
+                                  min_confidence=args['MIN_CONFIDENCE'],
+                                  nms_max_overlap=args['NMS_MAX_OVERLAP'],
+                                  max_iou_distance=args['MAX_IOU_DISTANCE'],
+                                  max_age=args['MAX_AGE'],
+                                  n_init=args['N_INIT'],
+                                  nn_budget=args['NN_BUDGET'],
+                                  use_cuda=True)
             
             # draw boxes for visualization
             bbox_xyxy = []
