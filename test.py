@@ -89,11 +89,11 @@ def _get_features(bbox_xywh, ori_img, width, height, encoder):
         return features, box_left_idx
 
 
-def main(video_path, dfile_name=r'./det'):
+
+
+def main(video_path, dfile_name=r'./det/dets/', config_path='./cfg/config.json'):
     
     # Initialize
-    #metric = NearestNeighbor("cosine", 0.7)
-    #kf = KalmanFilter()
     if dfile_name is not None:
         files = []
         detections = []
@@ -104,8 +104,7 @@ def main(video_path, dfile_name=r'./det'):
                 detections.append(np.array(np.loadtxt(os.path.join(dfile_name, file))))
     else:
         detections = get_detections()
-    #my_tracker = Tracker(metric, kf)
-    encoder = Encoder(r"./deepsort/checkpoints/ckpt.t7")
+    
     
     output_path = r'./output/output.txt'
     save_txt = True
@@ -149,7 +148,7 @@ def main(video_path, dfile_name=r'./det'):
 
             dets = [[bboxes[j], features[j]] for j in range(len(bboxes))]
             
-            outputs = deep.update(bboxes, frame)
+            outputs = deep.update(bboxes, scores, frame)
             
             # draw boxes for visualization
             bbox_xyxy = []
