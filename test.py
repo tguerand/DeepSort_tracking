@@ -130,7 +130,15 @@ def main(video_path, dfile_name=r'./det/dets/', config_path='./cfg/config.json')
     # Load video
     vid = cv2.VideoCapture(video_path)
     
-    deep = deep_sort.DeepSort(r"./deepsort/checkpoints/new_ckpt.t7")
+    deep = deep_sort.DeepSort(r"./deepsort/checkpoints/new_ckpt.t7",
+                              max_dist=args['MAX_DIST'],
+                              min_confidence=args['MIN_CONFIDENCE'],
+                              nms_max_overlap=args['NMS_MAX_OVERLAP'],
+                              max_iou_distance=args['MAX_IOU_DISTANCE'],
+                              max_age=args['MAX_AGE'],
+                              n_init=args['N_INIT'],
+                              nn_budget=args['NN_BUDGET'],
+                              use_cuda=True)
     
    
     i = 0
@@ -142,7 +150,6 @@ def main(video_path, dfile_name=r'./det/dets/', config_path='./cfg/config.json')
         if ret:
             frame = cv2.resize(frame, (416, 416))
             
-            print(detections[i])
             bboxes, scores = detections[i][:,:4], detections[i][:,4]
             bboxes = [_tlwh_to_xywh(bbox) for bbox in bboxes]
             
@@ -153,26 +160,18 @@ def main(video_path, dfile_name=r'./det/dets/', config_path='./cfg/config.json')
             
             
             for idx, box in enumerate(bboxes):
-                if (box == [0, 0, 0, 0]).all():
+                if box == [0, 0, 0, 0]:
                     bboxes = np.delete(bboxes, idx, axis=0)
                     scores = np.delete(scores, idx)
 
             
-            outputs = deep.update(bboxes, scores, frame,
-                                  max_dist=args['MAX_DIST'],
-                                  min_confidence=args['MIN_CONFIDENCE'],
-                                  nms_max_overlap=args['NMS_MAX_OVERLAP'],
-                                  max_iou_distance=args['MAX_IOU_DISTANCE'],
-                                  max_age=args['MAX_AGE'],
-                                  n_init=args['N_INIT'],
-                                  nn_budget=args['NN_BUDGET'],
-                                  use_cuda=True)
+            outputs = deep.update(bboxes, scores, frame)
             
             # draw boxes for visualization
             bbox_xyxy = []
             if len(outputs) > 0:
                 bbox_xyxy = outputs[:, :4]
-                #bbox_xyxy = [_xywh_to_xyxy(bbox[:4], width, height) for bbox in outputs]
+                
                 identities = outputs[:, -1]
                 draw_boxes(frame, bbox_xyxy, identities)
 
