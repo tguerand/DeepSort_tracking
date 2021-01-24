@@ -3,3 +3,5 @@ data/MOT16
 data/MOT16.zip
 yolov3.weights
 deep_sort_pytorch
+output/originals
+output/frames
