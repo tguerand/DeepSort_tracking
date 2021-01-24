@@ -62,7 +62,7 @@ def draw_boxes(img, bbox, identities=None, offset=(0, 0)):
         color = compute_color_for_labels(id)
         label = '{}{:d}'.format("", id)
         t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 2, 2)[0]
-        cv2.rectangle(img, (x1, y1), (x2, y2), color, 3)
+        cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
         cv2.rectangle(
             img, (x1, y1), (x1 + t_size[0] + 3, y1 + t_size[1] + 4), color, -1)
         cv2.putText(img, label, (x1, y1 +
@@ -180,7 +180,7 @@ def main(video_path, dfile_name=r'./det/dets/', config_path='./cfg/config.json')
     
     deep = deep_sort.DeepSort(r"./deepsort/checkpoints/new_ckpt.t7",
                               max_dist=args['MAX_DIST'],
-                              min_confidence=0.8,#args['MIN_CONFIDENCE'],
+                              min_confidence=args['MIN_CONFIDENCE'],
                               nms_max_overlap=args['NMS_MAX_OVERLAP'],
                               max_iou_distance=args['MAX_IOU_DISTANCE'],
                               max_age=args['MAX_AGE'],
@@ -188,7 +188,10 @@ def main(video_path, dfile_name=r'./det/dets/', config_path='./cfg/config.json')
                               nn_budget=args['NN_BUDGET'],
                               use_cuda=True)
     
-   
+    if os.path.exists(output_path):
+        os.remove(output_path)
+    
+    
     i = 0
     while True:
         ret, frame = vid.read()
@@ -249,9 +252,9 @@ def main(video_path, dfile_name=r'./det/dets/', config_path='./cfg/config.json')
     # create video
     reconstruct.reconstruct(r'./data/MOT16/train/MOT16-02/img1',
                             output_path,
-                            out=r'./output/output08.avi')
+                            out_path=r'./output/output_iou_09.avi')
         
     
 if __name__ == "__main__":
-    #main(dfile_name=None)
+    
     main(videofile)#, dfile_name=None)
