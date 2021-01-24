@@ -47,8 +47,10 @@ def reconstruct(dir_path, results_path, out_path='./output/recon.avi'):
     
     results = np.loadtxt(results_path)
     frames = results[:,0]
-    bboxes = results[:, 1:5]
+    bboxes = results[:, 2:6]
     identities = results[:, 1]
+    
+    idx_advance = 60
     
     img_array = []
     for filename in glob.glob(os.path.join(dir_path , r'*.jpg')):
@@ -62,7 +64,8 @@ def reconstruct(dir_path, results_path, out_path='./output/recon.avi'):
         idx = np.where(frames == i+1)
         bbox_xyxy = bboxes[idx]
         identity = identities[idx]
-        draw_boxes(frame, bbox_xyxy, identity)
+        real_idx = (i + idx_advance)%len(img_array)
+        draw_boxes(img_array[real_idx], bbox_xyxy, identity)
      
     
     out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*'DIVX'), 15, size)
