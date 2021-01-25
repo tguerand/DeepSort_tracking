@@ -16,7 +16,9 @@ python main.py --video_path VIDEO_PATH --out_path OUT_PATH
 '''
 
 Where :
+
 VIDEO_PATH : the path of your video, ex: 'video.avi', default='./data/video.avi/'
+
 OUT_PATH : the directory of your outputs, ex: './output/', default='./output/'
 
 ## Other arguments
@@ -28,4 +30,5 @@ OUT_PATH : the directory of your outputs, ex: './output/', default='./output/'
 ## Final Report
 
 https://www.overleaf.com/project/600aeb2b4d54a11fe0cb9d44 - report
+
 https://www.overleaf.com/project/600dedb46770cf06f8384b83 - slides
