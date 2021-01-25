@@ -22,6 +22,7 @@ OUT_PATH : the directory of your outputs, ex: './output/', default='./output/'
 ## Other arguments
 
 --dets : the directory path of your detections files if you have already existant ones, default=None
+
 --deepsort_cfg : the path of the config json file for deepsort, default='.cfg/config.json'
 
 ## Final Report
