@@ -84,7 +84,7 @@ def _tlwh_to_xywh(bbox_tlwh):
     return [x_c, y_c, w, h] 
 
 
-def get_detections(videofile):
+def get_detections(video_file):
     ## Load data
     cap = cv2.VideoCapture(videofile)  
     assert cap.isOpened(), 'Cannot capture source'
@@ -256,10 +256,10 @@ def main(video_path,img_orig, dfile_name=r'./det/dets/', config_path='./cfg/conf
     reconstruct.reconstruct(img_orig,
                             output_path,
                             out_path=save_path_vid,
-                            idx_advance=0)
+                            idx_advance=60)
         
     
 if __name__ == "__main__":
-    videofile = r'.\data\set01_000.avi'
-    img_orig = r'.\data\caltech_extracted\set01\V000\images'
-    main(videofile, img_orig) #dfile_name=None)
+    videofile = r'.\data\MOT16\video.avi'
+    img_orig = r'.\data\train\MOT16-02\img1'
+    main(videofile, img_orig)# dfile_name=None)

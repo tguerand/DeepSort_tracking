@@ -12,7 +12,7 @@ import glob
 from tqdm import tqdm
 
 dir_path = r'./data/MOT16/train/MOT16-02/img1'
-results_path = r'./output/output.txt'
+results_path = r'./output/vide_output.txt'
 
 palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
 
