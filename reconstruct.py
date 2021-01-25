@@ -56,7 +56,7 @@ def reconstruct(dir_path, results_path, out_path='./output/recon.avi', idx_advan
         img = cv2.imread(filename)
         img = cv2.resize(img, (416, 416))
         height, width, layers = img.shape
-        size = (width,height)
+        the_size = (width,height)
         img_array.append(img)
      
     for i, frame in enumerate(img_array):
@@ -67,7 +67,7 @@ def reconstruct(dir_path, results_path, out_path='./output/recon.avi', idx_advan
         draw_boxes(img_array[real_idx], bbox_xyxy, identity)
      
     
-    out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*'DIVX'), 15, size)
+    out = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*'DIVX'), 15, the_size)
      
     for i in tqdm(range(len(img_array))):
         out.write(img_array[i])

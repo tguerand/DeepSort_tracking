@@ -23,6 +23,7 @@ import random
 import img2vid
 import json
 import reconstruct
+import argparse
 
 from deepsort.model_encoder.encoder import Encoder
 #from deepsort.metrics import NearestNeighbor
@@ -148,7 +149,7 @@ def get_config(config_path):
     return dico
 
 
-def main(video_path,img_orig, dfile_name=r'./det/dets/', config_path='./cfg/config.json'):
+def main(video_path,out_dir='./output/', dfile_name=r'./det/dets/', config_path='./cfg/config.json'):
     
     # Initialize
     if dfile_name is not None:
@@ -164,16 +165,15 @@ def main(video_path,img_orig, dfile_name=r'./det/dets/', config_path='./cfg/conf
     
     args = get_config(config_path)
     fname = os.path.split(video_path)[-1]
-    output_path = os.path.join(r'./output/',fname[:-5] + '_output.txt')
+    output_path = os.path.join(out_dir,fname[:-5] + '_output.txt')
     save_txt = True
     save_vid = True
-    save_path = os.path.join(r'./output/',fname[:-5])
-    save_path_vid = os.path.join(r'./output/',fname[:-5]+'_output.avi')
+    save_path = os.path.join(out_dir,fname[:-5])
+    save_path_vid = os.path.join(out_dir,fname[:-5]+'_output.avi')
     
     
-    out_path = r"./output"
-    if not os.path.exists(out_path):
-        os.mkdir(out_path)
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
         
     # Load video
     vid = cv2.VideoCapture(video_path)
@@ -200,7 +200,7 @@ def main(video_path,img_orig, dfile_name=r'./det/dets/', config_path='./cfg/conf
         
         if ret:
             frame = cv2.resize(frame, (416, 416))
-            
+            cv2.imsave(frame, os.path.join(out_dir, 'orig_img', 'frame'+str(i)+'.jpg'))
             if len(detections[i].shape)==1:
                 bboxes, scores = [detections[i][:4]], [detections[i][4]]
             else:
@@ -242,7 +242,7 @@ def main(video_path,img_orig, dfile_name=r'./det/dets/', config_path='./cfg/conf
                                                        bbox_top, bbox_w, bbox_h, -1, -1, -1, -1))  # label format
         
             if save_vid:
-                save_path = out_path + r"/frames/frame" + str(i) + ".jpg"
+                save_path = out_dir + r"/frames/frame" + str(i) + ".jpg"
                 cv2.imwrite(save_path, frame)
 
         
@@ -251,15 +251,30 @@ def main(video_path,img_orig, dfile_name=r'./det/dets/', config_path='./cfg/conf
             break
         
         i+=1
-        
+    img_orig = os.path.join(out_dir, 'orig_img')
     # create video
     reconstruct.reconstruct(img_orig,
-                            output_path,
+                            out_dir,
                             out_path=save_path_vid,
                             idx_advance=60)
-        
+
+def parse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--video_path', type=str,
+                        default=r"./data/video.avi", help='Path of the video')
+    parser.add_argument('--out_path', type=str,
+                        default=r'./output/', help='The directory path where the outputs will be saved')
+    parser.add_argument('--deepsort_cfg', type=str,
+                        default=r'./cfg/config.json', help='Path of the config file for deepsort')
+    parser.add_argument('--dets', type=str,
+                        default=None, help='Directory path of already existant detections file')
+    
+  
     
 if __name__ == "__main__":
-    videofile = r'.\data\MOT16\video.avi'
-    img_orig = r'.\data\train\MOT16-02\img1'
-    main(videofile, img_orig)# dfile_name=None)
+    args = parse()
+    videofile = args.video_path
+    out_ = args.out_path
+    cfg = args.deepsort_cfg
+    dets = args.dets
+    main(videofile, out_, dets=dets, config=cfg)# dfile_name=None)
