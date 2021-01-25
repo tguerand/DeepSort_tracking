@@ -5,3 +5,6 @@ yolov3.weights
 deep_sort_pytorch
 output/originals
 output/frames
+data/caltech
+data/caltech_extracted
+output

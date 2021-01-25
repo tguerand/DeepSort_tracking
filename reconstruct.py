@@ -43,14 +43,13 @@ def draw_boxes(img, bbox, identities=None, offset=(0, 0)):
                                  t_size[1] + 4), cv2.FONT_HERSHEY_PLAIN, 2, [255, 255, 255], 2)
     return img
 
-def reconstruct(dir_path, results_path, out_path='./output/recon.avi'):
+def reconstruct(dir_path, results_path, out_path='./output/recon.avi', idx_advance=60):
     
     results = np.loadtxt(results_path)
     frames = results[:,0]
     bboxes = results[:, 2:6]
     identities = results[:, 1]
     
-    idx_advance = 60
     
     img_array = []
     for filename in glob.glob(os.path.join(dir_path , r'*.jpg')):

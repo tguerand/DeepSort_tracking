@@ -12,8 +12,8 @@ import glob
 from tqdm import tqdm
 import os
  
-dir_path = r'C:\Users\trist\Documents\CS\3A\DL\project\DeepSort_tracking\output\frames'
-out_path = r'C:\Users\trist\Documents\CS\3A\DL\project\DeepSort_tracking\output\output.avi'
+dir_path = r'.\data\caltech_extracted\set01\V000\images'
+out_path = r'.\data\set01_000.avi'
 
 
     

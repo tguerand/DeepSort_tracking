@@ -84,7 +84,7 @@ def _tlwh_to_xywh(bbox_tlwh):
     return [x_c, y_c, w, h] 
 
 
-def get_detections():
+def get_detections(videofile):
     ## Load data
     cap = cv2.VideoCapture(videofile)  
     assert cap.isOpened(), 'Cannot capture source'
@@ -110,10 +110,9 @@ def get_detections():
     
     model.eval()
     
-    frames = 0  
-    start = time.time()
-    d =[] #list of box coordinates
-    s =[] # list of box scores
+
+    d =[] #list of box coordinates and box scores
+    
     i = 0
     while cap.isOpened():
         ret, frame = cap.read()
@@ -126,8 +125,7 @@ def get_detections():
             d_s[:,:4] = detector
             d_s[:,4] = scores
             
-            d.append(detector)
-            s.append(scores)
+            d.append(d_s)
             file = open('./det/dets/detections'+str(i)+'.txt','w')
             np.savetxt(file, d_s, fmt="%1.3f")
             file.close()
@@ -135,7 +133,7 @@ def get_detections():
             break 
         i+=1
     
-    return d, s
+    return d_s
 # d is a list of all boxes detected in different video frames d[i] : coordinates of boxes detected in frame i 
 #d : list of boxes
 #d[i] : boxes found in frame i of the video 
@@ -150,7 +148,7 @@ def get_config(config_path):
     return dico
 
 
-def main(video_path, dfile_name=r'./det/dets/', config_path='./cfg/config.json'):
+def main(video_path,img_orig, dfile_name=r'./det/dets/', config_path='./cfg/config.json'):
     
     # Initialize
     if dfile_name is not None:
@@ -162,13 +160,15 @@ def main(video_path, dfile_name=r'./det/dets/', config_path='./cfg/config.json')
                 
                 detections.append(np.array(np.loadtxt(os.path.join(dfile_name, file))))
     else:
-        detections = get_detections()
+        detections = get_detections(video_path)
     
     args = get_config(config_path)
-    output_path = r'./output/output.txt'
+    fname = os.path.split(video_path)[-1]
+    output_path = os.path.join(r'./output/',fname[:-5] + '_output.txt')
     save_txt = True
     save_vid = True
-    save_path = r'./output/output.avi'
+    save_path = os.path.join(r'./output/',fname[:-5])
+    save_path_vid = os.path.join(r'./output/',fname[:-5]+'_output.avi')
     
     
     out_path = r"./output"
@@ -201,7 +201,10 @@ def main(video_path, dfile_name=r'./det/dets/', config_path='./cfg/config.json')
         if ret:
             frame = cv2.resize(frame, (416, 416))
             
-            bboxes, scores = detections[i][:,:4], detections[i][:,4]
+            if len(detections[i].shape)==1:
+                bboxes, scores = [detections[i][:4]], [detections[i][4]]
+            else:
+                bboxes, scores = detections[i][:,:4], detections[i][:,4]
             bboxes = [_tlwh_to_xywh(bbox) for bbox in bboxes]
             
             if len(bboxes) == 0:
@@ -250,11 +253,13 @@ def main(video_path, dfile_name=r'./det/dets/', config_path='./cfg/config.json')
         i+=1
         
     # create video
-    reconstruct.reconstruct(r'./data/MOT16/train/MOT16-02/img1',
+    reconstruct.reconstruct(img_orig,
                             output_path,
-                            out_path=r'./output/output_iou_09.avi')
+                            out_path=save_path_vid,
+                            idx_advance=0)
         
     
 if __name__ == "__main__":
-    
-    main(videofile)#, dfile_name=None)
+    videofile = r'.\data\set01_000.avi'
+    img_orig = r'.\data\caltech_extracted\set01\V000\images'
+    main(videofile, img_orig) #dfile_name=None)
